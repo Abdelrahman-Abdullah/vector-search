@@ -24,6 +24,10 @@ return new class extends Migration
             $table->string('source_file')->nullable();  // original uploaded filename
             $table->string('file_type')->nullable();    // pdf, txt, docx...
             $table->integer('total_chunks')->default(0);
+            $table->enum('status', ['pending', 'processing', 'completed', 'failed'])->default('pending');
+            $table->text('error_message')->nullable();
+            $table->timestamp('processing_started_at')->nullable();
+            $table->timestamp('processing_completed_at')->nullable();
             $table->timestamps();
         });
 
@@ -33,7 +37,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('article_id')->constrained()->onDelete('cascade');
             $table->integer('chunk_index');              // order of the chunk in the article
-            $table->text('chunk_text');                 // the actual text of the chunk
+            $table->text('content')->nullable();                 // the actual text of the chunk
             $table->vector('embedding', 1536);         // vector embedding (1536 dimensions for OpenAI's models)
             $table->timestamps();   
         });
