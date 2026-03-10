@@ -21,7 +21,7 @@ class FileParserService
        
     }
 
-    private function getFileType(UploadedFile $file): string
+    public function getFileType(UploadedFile $file): string
     {
         return  strtolower( $file->getClientOriginalExtension() );
     }
