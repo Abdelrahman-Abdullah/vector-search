@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Article;
+use App\Services\ChunkService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -20,17 +21,27 @@ class ProcessArticleJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Article $article){}
+    public function __construct(
+        public Article $article,
+    ){}
 
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(ChunkService $chunkService): void
     {
         Log::info("Processing article ID: {$this->article->id}");
         $this->article->update([
             'status' => 'processing',
             'processing_started_at' => now(),
         ]);
+
+        $chunks = $chunkService->chunk($this->article->body ?? '');
+        if (empty($chunks)) {
+            throw new \RuntimeException('No chunks generated.');
+        }
+
+
+
     }
 }
