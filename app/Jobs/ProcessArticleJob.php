@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ProcessArticleJob implements ShouldQueue
 {
@@ -19,13 +20,17 @@ class ProcessArticleJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(Article $article){}
+    public function __construct(public Article $article){}
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        //
+        Log::info("Processing article ID: {$this->article->id}");
+        $this->article->update([
+            'status' => 'processing',
+            'processing_started_at' => now(),
+        ]);
     }
 }
