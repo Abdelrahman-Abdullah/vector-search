@@ -23,6 +23,7 @@ class UploadFileRequest extends FormRequest
     {
         return [
             'file' => 'required|file|mimes:txt,pdf,docx,csv,md|max:20480', // Max file size of 20MB
+            'title' => 'nullable|string|max:255',
         ];
     }
 }

@@ -12,11 +12,11 @@ class FileParserService
     {
         $fileExtension = $this->getFileType($file);
         $filePath = $file->getPathname();
-        match ($fileExtension) {
-            'txt','md' => $this->extractText($file),
-            'csv' => $this->extractCsv($file),
-            'pdf' => $this->extractPdf($file),
-            default => throw new \RuntimeException("Unsupported file type: $fileExtension"),
+        return match ($fileExtension) {
+            'txt','md' => $this->extractText($filePath),
+            'csv' => $this->extractCsv($filePath),
+            'pdf' => $this->extractPdf($filePath),
+            default     => throw new \InvalidArgumentException("Unsupported file type: .{$fileExtension}"),
         };
        
     }

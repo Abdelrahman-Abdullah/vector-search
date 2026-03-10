@@ -17,11 +17,14 @@ class ArticleController extends Controller
 
         try {
             $content = $this->fileParserService->extract($file);
-
-            return response()->json(['content' => $content], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to parse file: ' . $e->getMessage()], 500);
         }
-     
+
+        if (trim($content) === '') {
+            return response()->json(['error' => 'No text could be extracted from the file.'], 400);
+        }
+
+
    }
 }
