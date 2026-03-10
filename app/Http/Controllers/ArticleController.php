@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UploadFileRequest;
+use App\Jobs\ProcessArticleJob;
 use App\Models\Article;
 use App\Services\FileParserService;
 
@@ -53,8 +54,8 @@ class ArticleController extends Controller
         ]);
 
         // Dispatch the job to process the article content
-        // ----
-        
+        ProcessArticleJob::dispatch($article)->onQueue('embeddings');
+
         return response()->json([
             'message'    => 'Received! Processing in background...',
             'article_id' => $article->id,
