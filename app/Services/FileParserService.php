@@ -8,17 +8,17 @@ use Smalot\PdfParser\Parser;
 
 class FileParserService
 {
-    public function extract(UploadedFile $file)
+    public function extract(UploadedFile $file): string
     {
         $fileExtension = $this->getFileType($file);
         $filePath = $file->getPathname();
+
         return match ($fileExtension) {
-            'txt','md' => $this->extractText($filePath),
+            'txt', 'md' => $this->extractText($filePath),
             'csv' => $this->extractCsv($filePath),
             'pdf' => $this->extractPdf($filePath),
-            default     => throw new \InvalidArgumentException("Unsupported file type: .{$fileExtension}"),
+            default => throw new \InvalidArgumentException("Unsupported file type: .{$fileExtension}"),
         };
-       
     }
 
     public function getFileType(UploadedFile $file): string
@@ -28,7 +28,13 @@ class FileParserService
 
     private function extractText(string $file): string
     {
-        return file_get_contents($file);
+        $content = file_get_contents($file);
+
+        if ($content === false) {
+            throw new \RuntimeException('Failed to read text file content.');
+        }
+
+        return $content;
     }
 
     private function extractCsv(string $file): string
@@ -46,22 +52,19 @@ class FileParserService
 
     }
 
-    private function extractPdf(string $file)
+    private function extractPdf(string $file): string
     {
-        $parser = new Parser(); 
+        $parser = new Parser();
         $pdf = $parser->parseFile($file);
-        if (!$pdf) {
-            throw new \RuntimeException("Failed to parse PDF file.");
-        }
 
-        $pdfText =  $pdf->getText();
+        $pdfText = $pdf->getText();
         if (trim($pdfText) === '') {
-                throw new \RuntimeException(
+            throw new \RuntimeException(
                 'Could not extract text from PDF. ' .
                 'The file may be scanned/image-based.'
             );
         }
-        return $pdfText;
 
+        return $pdfText;
     }
 }
