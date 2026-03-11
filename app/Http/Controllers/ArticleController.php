@@ -2,19 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ArticleChunksSearchRequest;
+use App\Http\Requests\SearchVectorRequest;
 use App\Http\Requests\UploadFileRequest;
-use App\Jobs\ProcessArticleJob;
 use App\Models\Article;
-use App\Services\EmbeddingService;
+use App\Services\ArticleIngestionService;
+use App\Services\ArticleSearchService;
 use App\Services\FileParserService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ArticleController extends Controller
 {
     public function __construct(
         public FileParserService $fileParserService,
-        public EmbeddingService $embedder
+        public ArticleIngestionService $ingestionService,
+        public ArticleSearchService $searchService,
     ){}
 
    public function upload(UploadFileRequest $request)
@@ -23,7 +24,7 @@ class ArticleController extends Controller
 
         try {
             $content = $this->fileParserService->extract($file);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json(['error' => 'Failed to parse file: ' . $e->getMessage()], 500);
         }
 
@@ -31,7 +32,7 @@ class ArticleController extends Controller
             return response()->json(['error' => 'No text could be extracted from the file.'], 400);
         }
 
-       return $this->dispatchProcessContentJob(
+       return $this->ingestionService->dispatchProcessContentJob(
             content: $content,
             title: $request->input('title', $file->getClientOriginalName()),
             fileType: $this->fileParserService->getFileType($file),
@@ -41,53 +42,19 @@ class ArticleController extends Controller
 
    }
 
-   public function vectorSearch(Request $request)
+   public function vectorSearch(SearchVectorRequest $request)
    {
-       $query = $request->query('q', '');
-       $top = max(1 , min(20, $request->query('top', 5 )));
+       $query = (string) $request->validated('q');
+       $top = (int) $request->validated('top', 5);
 
-       $queryVector = $this->embedder->embed($query);
-       $queryStr = "[" . implode(',', $queryVector) . "]";
-
-       $rows = DB::select("
-       SELECT
-            ac.article_id,
-            ac.chunk_index,
-            ac.content AS chunk_content,
-            a.title,
-            a.total_chunks,
-            a.status,
-            (ac.embedding <=> :vector) AS distance
-       FROM article_chunks ac
-       JOIN articles a ON a.id = ac.article_id
-       WHERE a.status = 'completed'
-       ORDER BY ac.embedding <=> :vector2
-       LIMIT :limit
-       ", ["vector" =>$queryStr, "vector2" => $queryStr, "limit"=> $top * 3 ]);
-
-
-            $seen = [];
-            $results = [];
-    
-            foreach ($rows as $row) {
-                if (isset($seen[$row->article_id])) continue;
-                    $seen[$row->article_id] = true;
-                    $results[] = [
-                        'article_id' => $row->article_id,
-                        'title' => $row->title,
-                        'similarity' => round(1 - $row->distance, 4),
-                        'matched_chunk' => [
-                                'index'   => $row->chunk_index,
-                                'preview' => substr($row->chunk_content, 0, 300) . '...',
-                            ],
-                    ];
-    
-                    if (count($results) >= $top) break;
-            }
-            return response()->json(['method' => 'Vector Search (pgvector)', 'query' => $query, 'results' => $results]);
+       return response()->json([
+            'method' => 'Vector Search (pgvector)',
+            'query' => $query,
+            'results' => $this->searchService->searchAcrossArticles($query, $top),
+       ]);
    }
 
-   public function status($id)
+   public function status(int $id)
    {
         $article = Article::find($id);
         if (!$article)
@@ -108,10 +75,12 @@ class ArticleController extends Controller
             ]);
    }
 
-   public function checkChunks(Request $request, $id)
+   public function checkChunks(ArticleChunksSearchRequest $request, int $id)
    {
-        $article = Article::with('chunks')->find($id);
-        $query = $request->input('q');
+        $article = Article::find($id);
+        $query = (string) $request->validated('q');
+        $top = (int) $request->validated('top', 10);
+
         if (!$article)
         {
             return response()->json([
@@ -120,19 +89,7 @@ class ArticleController extends Controller
             
         }
 
-
-        if (!$query) return [];
-
-        $queryVector = $this->embedder->embed($query);
-        $chunks = $article->chunks->map(
-            fn($chunk) => [
-                'chunk_index' => $chunk->chunk_index,
-                'content'     => $chunk->content,
-                'similarity'  => $chunk->embedding 
-                    ? round($this->embedder->cosineSimilarity($queryVector, $chunk->embedding), 4)
-                    : 0
-            ]
-        )->sortByDesc('similarity')->values();
+        $chunks = $this->searchService->searchWithinArticle($article->id, $query, $top);
 
         return response()->json([
             'article_id'   => $article->id,
@@ -141,33 +98,5 @@ class ArticleController extends Controller
             'chunks'       => $chunks,
         ]);
 
-   }
-
-   private function dispatchProcessContentJob(
-       string $content,
-       string $title,
-       ?string $fileType,
-       ?string $fileName
-
-   )
-   {
-        $article = Article::create([
-            'title' => $title,
-            'body' => $content,
-            'file_type' => $fileType,
-            'file_name' => $fileName,
-            'status' => 'pending',
-            'processing_started_at' => now(),
-        ]);
-
-        // Dispatch the job to process the article content
-        ProcessArticleJob::dispatch($article)->onQueue('embeddings');
-
-        return response()->json([
-            'message'    => 'Received! Processing in background...',
-            'article_id' => $article->id,
-            'status'     => 'pending',
-            'poll_url'   => "/api/articles/{$article->id}/status",
-        ], 202);
    }
 }
