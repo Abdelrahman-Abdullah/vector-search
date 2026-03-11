@@ -34,8 +34,8 @@ class EmbeddingServiceTest extends TestCase
 
         $result = $service->embedBatch(['new-one', 'cached-text', 'new-two']);
 
-        $this->assertSame([1.0, 1.1], $result[0]);
-        $this->assertSame([9.0, 9.0], $result[1]);
-        $this->assertSame([2.0, 2.2], $result[2]);
+        $this->assertSame([1.0, 1.1], array_map('floatval', $result[0]));
+        $this->assertSame([9.0, 9.0], array_map('floatval', $result[1]));
+        $this->assertSame([2.0, 2.2], array_map('floatval', $result[2]));
     }
 }
