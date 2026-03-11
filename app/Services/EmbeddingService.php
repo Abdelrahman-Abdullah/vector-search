@@ -10,6 +10,21 @@ class EmbeddingService
     private string $modelName = 'gemini-embedding-001:embedContent';
     private int $cacheTTL     = 86400; // 24 hours
 
+    public function embed(string $text): array
+    {
+        $key    = $this->cacheKey($text);
+        $cached = Cache::get($key);
+
+        if ($cached !== null) {
+            return $cached; // free & instant from Redis
+        }
+
+        $vector = $this->embedBatch([$text])[0];
+        Cache::put($key, $vector, $this->cacheTTL);
+
+        return $vector;
+    }
+
     public function embedBatch(array $texts): array
     {
         if (empty($texts))  return [];

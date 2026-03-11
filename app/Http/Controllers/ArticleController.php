@@ -36,6 +36,7 @@ class ArticleController extends Controller
 
 
    }
+
    private function dispatchProcessContentJob(
        string $content,
        string $title,
