@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('title');
             $table->longText('body')->nullable();       // raw text content
             $table->string('source_file')->nullable();  // original uploaded filename
-            $table->string('file_type')->nullable();    // pdf, txt, docx...
+            $table->string('file_type')->nullable();    // pdf, txt, csv, md
             $table->integer('total_chunks')->default(0);
             $table->enum('status', ['pending', 'processing', 'completed', 'failed'])->default('pending');
             $table->text('error_message')->nullable();
@@ -38,7 +38,8 @@ return new class extends Migration
             $table->foreignId('article_id')->constrained()->onDelete('cascade');
             $table->integer('chunk_index');              // order of the chunk in the article
             $table->text('content')->nullable();                 // the actual text of the chunk
-            $table->vector('embedding', 1536);         // vector embedding (1536 dimensions for OpenAI's models)
+            // Keep dimension aligned with EmbeddingService/config('services.gemini.embedding_dimensions').
+            $table->vector('embedding', 1536)->nullable();
             $table->timestamps();   
         });
 
@@ -54,7 +55,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('articles');
         Schema::dropIfExists('article_chunks');
+        Schema::dropIfExists('articles');
     }
 };
