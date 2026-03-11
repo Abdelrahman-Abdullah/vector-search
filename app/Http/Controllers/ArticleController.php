@@ -108,6 +108,41 @@ class ArticleController extends Controller
             ]);
    }
 
+   public function checkChunks(Request $request, $id)
+   {
+        $article = Article::with('chunks')->find($id);
+        $query = $request->input('q');
+        if (!$article)
+        {
+            return response()->json([
+                'error' => 'Article not found'
+             ], 404);
+            
+        }
+
+
+        if (!$query) return [];
+
+        $queryVector = $this->embedder->embed($query);
+        $chunks = $article->chunks->map(
+            fn($chunk) => [
+                'chunk_index' => $chunk->chunk_index,
+                'content'     => $chunk->content,
+                'similarity'  => $chunk->embedding 
+                    ? round($this->embedder->cosineSimilarity($queryVector, $chunk->embedding), 4)
+                    : 0
+            ]
+        )->sortByDesc('similarity')->values();
+
+        return response()->json([
+            'article_id'   => $article->id,
+            'title'        => $article->title,
+            'total_chunks' => $article->total_chunks,
+            'chunks'       => $chunks,
+        ]);
+
+   }
+
    private function dispatchProcessContentJob(
        string $content,
        string $title,
