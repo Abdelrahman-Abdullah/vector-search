@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 
 class EmbeddingService
 {
-    private string $modelName = 'gemini-embedding-001:embedContent';
+    private string $modelName = 'gemini-embedding-001';
     private int $cacheTTL     = 86400; // 24 hours
 
     public function embed(string $text): array
@@ -47,7 +47,6 @@ class EmbeddingService
         }
 
         $requests = $this->prepareBeforeEmbedding($toFitch);
-
         
         // Simulate embedding generation (replace with actual API call)
         $response = Http::withHeaders([
@@ -82,7 +81,7 @@ class EmbeddingService
     private function prepareBeforeEmbedding(array $texts): array
     {
         return array_map(fn($text) => [
-            "model"=> $this->modelName,
+            "model"=> "models/" . $this->modelName,
             "content" => [
                 "parts" => [
                     ["text" => $text]
