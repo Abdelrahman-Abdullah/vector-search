@@ -3,11 +3,14 @@
 namespace App\Jobs;
 
 use App\Models\Article;
+use App\Models\ArticleChunk;
 use App\Services\ChunkService;
+use App\Services\EmbeddingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProcessArticleJob implements ShouldQueue
@@ -28,7 +31,7 @@ class ProcessArticleJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ChunkService $chunkService): void
+    public function handle(ChunkService $chunker, EmbeddingService $embedder): void
     {
         Log::info("Processing article ID: {$this->article->id}");
         $this->article->update([
@@ -36,12 +39,40 @@ class ProcessArticleJob implements ShouldQueue
             'processing_started_at' => now(),
         ]);
 
-        $chunks = $chunkService->chunk($this->article->body ?? '');
+        $chunks = $chunker->chunk($this->article->body ?? '');
         if (empty($chunks)) {
             throw new \RuntimeException('No chunks generated.');
         }
+        $embeddings = $embedder->embedBatch(array_column($chunks, 'content'));
+        DB::transaction(function () use ($chunks ,$embeddings) {
+            $this->article->chunks()->delete(); // clean up if retrying
 
+            foreach ($chunks as $index => $chunk) {
+                ArticleChunk::create([
+                    'article_id'  => $this->article->id,
+                    'chunk_index' => $chunk['index'],
+                    'content'     => $chunk['content'],
+                    'embedding'   => $embeddings[$index] ?? null,
+                ]);
 
+            }
+
+            $this->article->update([
+                'total_chunks' => count($chunks),
+                'status' => 'completed',
+                'processing_completed_at' => now(),
+                'error_message' => null
+            ]);
+        });
+        Log::info("Job completed", ['article_id' => $this->article->id, 'chunks' => count($chunks)]);
 
     }
-}
+
+    // Called only when ALL retries are exhausted
+    public function failed(\Throwable $e): void
+    {
+        $this->article->update([
+            'status'        => 'failed',
+            'error_message' => $e->getMessage(),
+        ]);
+    }}

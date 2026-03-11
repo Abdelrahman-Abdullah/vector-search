@@ -27,7 +27,7 @@ class ArticleController extends Controller
             return response()->json(['error' => 'No text could be extracted from the file.'], 400);
         }
 
-        $this->dispatchProcessContentJob(
+       return $this->dispatchProcessContentJob(
             content: $content,
             title: $request->input('title', $file->getClientOriginalName()),
             fileType: $this->fileParserService->getFileType($file),
@@ -46,7 +46,7 @@ class ArticleController extends Controller
    {
         $article = Article::create([
             'title' => $title,
-            'content' => $content,
+            'body' => $content,
             'file_type' => $fileType,
             'file_name' => $fileName,
             'status' => 'pending',

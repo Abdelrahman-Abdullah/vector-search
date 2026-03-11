@@ -7,24 +7,8 @@ use Illuminate\Support\Facades\Http;
 
 class EmbeddingService
 {
-    private string $modelName = 'text-embedding-3-small';
+    private string $modelName = 'gemini-embedding-001:embedContent';
     private int $cacheTTL     = 86400; // 24 hours
-
-    public function embed(string $text)
-    {
-        $key = $this->cacheKey($text);
-        $content = Cache::get($key);
-        if ($content) {
-            return $content;
-        }
-
-        // Simulate embedding generation (replace with actual API call)
-        $embedding = array_map('floatval', str_split(substr(hash('sha256', $text), 0, 64), 8));
-
-        Cache::put($key, $embedding, $this->cacheTTL);
-
-        return $embedding;
-    }
 
     public function embedBatch(array $texts): array
     {
@@ -47,24 +31,26 @@ class EmbeddingService
             return $result;
         }
 
+        $requests = $this->prepareBeforeEmbedding($toFitch);
+
+        
         // Simulate embedding generation (replace with actual API call)
-        $response = Http::withToken(env('OPENAI_API_KEY'))
+        $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => env('API_KEY')
+            ])
             ->timeout(60)
-            ->post('https://api.openai.com/v1/embeddings', [
-                'model' => $this->modelName,
-                'input' => $toFitch,
+            ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents", [
+                'requests' => $requests,
             ]);
 
         if ($response->failed()) {
-            throw new \RuntimeException('OpenAI API error: ' . $response->body());
+            throw new \RuntimeException('Gemini API error: ' . $response->body());
         }
 
-        $embeddings = $response->json('data');
-        $toFitchKeys = array_keys($toFitch);
-
-        foreach ($embeddings as $item) {
-            $originalIndex = $toFitchKeys[$item['index']];
-            $vector = $item['embedding'];
+        foreach ($response->json('embeddings') as $index => $item) {
+            $originalIndex = $index;
+            $vector = $item['values'];
             $result[$originalIndex] = $vector;
         }
 
@@ -76,6 +62,20 @@ class EmbeddingService
     private function cacheKey(string $text): string
     {
         return 'embedding:' . hash('sha256', $this->modelName . '||' . $text);
+    }
+
+    private function prepareBeforeEmbedding(array $texts): array
+    {
+        return array_map(fn($text) => [
+            "model"=> $this->modelName,
+            "content" => [
+                "parts" => [
+                    ["text" => $text]
+                ]
+            ],
+            "taskType" => "SEMANTIC_SIMILARITY",
+            "output_dimensionality" => 1536
+        ], $texts);
     }
 
     
