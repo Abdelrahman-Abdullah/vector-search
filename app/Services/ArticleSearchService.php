@@ -18,7 +18,6 @@ class ArticleSearchService
         $queryVector = $this->embedder->embed($query);
         $queryStr = '[' . implode(',', $queryVector) . ']';
 
-        // Pull extra rows then deduplicate by article_id to keep top N unique articles.
         $rows = DB::select(
             "
             SELECT
@@ -33,7 +32,7 @@ class ArticleSearchService
             ORDER BY ac.embedding <=> :vector2
             LIMIT :limit
             ",
-            ['vector' => $queryStr, 'vector2' => $queryStr, 'limit' => $top * 3]
+            ['vector' => $queryStr, 'vector2' => $queryStr, 'limit' => $top * 3] // multiply by 3 to get more candidates for deduplication
         );
 
         $seen = [];
