@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 
 class ProcessArticleJob implements ShouldQueue
 {
-    use Queueable, SerializesModels, InteractsWithQueue, Queueable;
+    use Queueable, SerializesModels, InteractsWithQueue;
 
     public int $tries = 3;
     public array $backoff = [10, 30, 60]; // seconds between retries
@@ -43,9 +43,11 @@ class ProcessArticleJob implements ShouldQueue
         if (empty($chunks)) {
             throw new \RuntimeException('No chunks generated.');
         }
+
         $embeddings = $embedder->embedBatch(array_column($chunks, 'content'));
         DB::transaction(function () use ($chunks ,$embeddings) {
-            $this->article->chunks()->delete(); // clean up if retrying
+            // Make retries idempotent: rebuild chunk rows from scratch.
+            $this->article->chunks()->delete();
 
             foreach ($chunks as $index => $chunk) {
                 ArticleChunk::create([

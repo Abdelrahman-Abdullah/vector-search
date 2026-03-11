@@ -5,7 +5,7 @@ namespace App\Services;
 class ChunkService
 {
     public int $chunkSize = 400; // Number of words per chunk
-    public int $overlapSize = 50; // Number of characters to overlap between chunks
+    public int $overlapSize = 50; // Number of words to overlap between chunks
 
     public function chunk(string $content)
     {
@@ -30,7 +30,7 @@ class ChunkService
             $chunks[] = [
                 'index' => $index++,
                 'content' => $contentChunk,
-                'word_count' => $end - $start, // 400 for the first chunk, 350 for the second chunk, etc.
+                'word_count' => $end - $start,
             ];
 
             if ($end >= $total) break; // Reached the end of the content
@@ -43,7 +43,8 @@ class ChunkService
 
 
     }
-        // Rough token estimate: 1 word ≈ 1.3 tokens
+
+    // Rough token estimate: 1 word ~= 1.3 tokens.
     public function estimateTokens(string $text): int
     {
         return (int) (str_word_count($text) * 1.3);
