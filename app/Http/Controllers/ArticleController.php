@@ -87,6 +87,27 @@ class ArticleController extends Controller
             return response()->json(['method' => 'Vector Search (pgvector)', 'query' => $query, 'results' => $results]);
    }
 
+   public function status($id)
+   {
+        $article = Article::find($id);
+        if (!$article)
+        {
+            return response()->json([
+                'error' => 'Article not found'
+             ], 404);
+            
+        }
+        return response()->json([
+            'article_id'   => $article->id,
+            'title'        => $article->title,
+            'status'       => $article->status,
+            'total_chunks' => $article->total_chunks,
+            'started_at'   => $article->processing_started_at,
+            'finished_at'  => $article->processing_completed_at,
+            'error'        => $article->error_message,
+            ]);
+   }
+
    private function dispatchProcessContentJob(
        string $content,
        string $title,
